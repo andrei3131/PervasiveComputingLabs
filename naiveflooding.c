@@ -19,6 +19,7 @@
 
 #define NO_OF_NODES 15
 
+
 struct message{
   uint16_t flood_id;
   uint8_t node_count;
