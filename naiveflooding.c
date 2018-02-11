@@ -42,6 +42,8 @@ request_message(void *ptr){
   printf("Send me a message\n");
 }
 
+#define PROBABILITY 0.2
+
 /*---------------------------------------------------------------------------*/
 static void
 broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from)
@@ -68,9 +70,11 @@ broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from)
     payload_recv.nodes[payload_recv.node_count]  = linkaddr_node_addr.u8[0];
     payload_recv.node_count = payload_recv.node_count + 1;
 
-    packetbuf_copyfrom(&payload_recv,sizeof(payload_recv));
-    broadcast_send(&broadcast);
-    printf("Broadcast message sent\n");
+    if(((double)rand() / (double)RAND_MAX) <= PROBABILITY) {	
+    	packetbuf_copyfrom(&payload_recv,sizeof(payload_recv));
+    	broadcast_send(&broadcast);
+    	printf("Broadcast message sent\n");
+    }	
     if(linkaddr_node_addr.u8[0] == 1){
       ctimer_reset(&message_sent);
     }
@@ -86,7 +90,7 @@ PROCESS_THREAD(main_process, ev, data)
   char *buf;
 
   PROCESS_BEGIN();
-  powertrace_start(CLOCK_SECOND * 10);
+  //powertrace_start(CLOCK_SECOND * 10);
   broadcast_open(&broadcast, 129, &broadcast_call);
   if(linkaddr_node_addr.u8[0] == 1){
     ctimer_set(&message_sent, CLOCK_SECOND * 10,request_message,NULL);   
