@@ -10,6 +10,22 @@ powerDictionary = {}
 disseminationMap = {}
 disseminationTimeMap = {}
 
+class NodeDisseminations:
+    def __init__(self, dissemination_id, currentTime):
+        self.disseminations_for_node = {}
+        self.disseminations_for_node[dissemination_id] = DeltaTime(currentTime)
+
+    def updateLastReceive(self, dissemination_id, currentTime):
+        self.disseminations_for_node[dissemination_id].updateLastReceiveAt(currentTime)
+
+    def computeAvgDisseminationTimeForNode(self):
+        s = 0
+        for dissemination in self.disseminations_for_node:
+            deltaTime = self.disseminations_for_node[dissemination]
+            if deltaTime.isValid():
+                s += deltaTime.getTimeDifference()
+        return s / len(self.disseminations_for_node)
+
 class DeltaTime:
     def __init__(self, sentAt):
         self.sentAt = sentAt
@@ -44,21 +60,22 @@ def plotE2E():
     plt.show()
 
 def plotDisseminationTime():
-    dissemination_ids = [d for d in disseminationTimeMap if disseminationTimeMap[d].isValid()]
-    deltaTimes = [disseminationTimeMap[d].getTimeDifference() for d in disseminationMap if disseminationTimeMap[d].isValid()]
+    node_ids = [n for n in disseminationTimeMap]
+    avgs_per_node = [disseminationTimeMap[n].computeAvgDisseminationTimeForNode() for n in disseminationTimeMap]
     fig = plt.figure()
-    plt.plot(dissemination_ids, deltaTimes, marker='x', markersize=3)
+    plt.plot(node_ids, avgs_per_node, marker='x', markersize=3)
+    
     s = 0
-    for dissemination in disseminationTimeMap:
-        deltaTime = disseminationTimeMap[dissemination]
-        if deltaTime.isValid():
-           s += deltaTime.getTimeDifference()
-    plt.axhline(y=s / len(disseminationTimeMap), color='r', linestyle='-', label='Average dissemination time ' + '%.3f'%(s / len(disseminationTimeMap)) + "ms")
+    for originating_node in disseminationTimeMap:
+        nodeDisseminations = disseminationTimeMap[originating_node]
+        s += nodeDisseminations.computeAvgDisseminationTimeForNode()
+    
+    plt.axhline(y=s / len(disseminationTimeMap), color='r', linestyle='-', label='Average dissemination time ' + '%.3f'%(s / 30) + "ms")
 
-    plt.gca().set_ylim([0, 300])
-    fig.suptitle("Dissemination Time Graph", fontsize=12)
-    plt.xlabel('Dissemination ID', fontsize=18)
-    plt.ylabel('Dissemination time', fontsize=16)
+    plt.gca().set_ylim([0, 200])
+    fig.suptitle("Dissemination Time Graph Per Node", fontsize=12)
+    plt.xlabel('Node ID', fontsize=18)
+    plt.ylabel('Average node dissemination time', fontsize=16)
     plt.legend()
 
     plt.show()
@@ -82,11 +99,14 @@ def simpleProcess(line):
     if("Broadcast message sent" in line and potential_dissemination_id.isdigit()):
         dissemination_id = int(potential_dissemination_id)
         disseminationMap[dissemination_id] = 0
-        disseminationTimeMap[dissemination_id] = DeltaTime(currentTimeMilliseconds)
+        # id is the id of the originating node
+        disseminationTimeMap[id] = NodeDisseminations(dissemination_id, currentTimeMilliseconds)
     if("Broadcast recv from" in line and line.split(" ")[-1].isdigit()):
-        id = int(line.split(" ")[-1])
-        disseminationMap[id] += 1
-        disseminationTimeMap[id].updateLastReceiveAt(currentTimeMilliseconds)
+        dissem_id = int(line.split(" ")[-1])
+        disseminationMap[dissem_id] += 1
+
+        originating_node = int(line.split(" ")[-4])
+        disseminationTimeMap[originating_node].updateLastReceive(dissem_id, currentTimeMilliseconds)
         # Debug the outlier: for id 195: sentAt = 00:34:54,  lastReceiveAt = 00:35:24
         # if(disseminationTimeMap[id].getTimeDifference() > 30000):
         #   import pdb; pdb.set_trace()
@@ -130,12 +150,11 @@ def printE2ESummary():
 
 def printDisseminationTimeSummary():
     s = 0
-    for dissemination in disseminationTimeMap:
-        deltaTime = disseminationTimeMap[dissemination]
-        if deltaTime.isValid():
-           s += deltaTime.getTimeDifference()
-           print("Dissemination " + str(dissemination) + " has dissemination time: " + str(deltaTime.getTimeDifference()) + "ms")
-    print("Average dissemination time is " + str(s / len(disseminationTimeMap)) + "ms\n")
+    for originating_node in disseminationTimeMap:
+        nodeDisseminations = disseminationTimeMap[originating_node]
+        s += nodeDisseminations.computeAvgDisseminationTimeForNode()
+        print("Node " + str(originating_node) + " has dissemination time: " + str(nodeDisseminations.computeAvgDisseminationTimeForNode()) + "ms")
+    print("Average dissemination time is " + str(s / 30) + "ms\n")
 
 
 def processline(f, line):
@@ -173,7 +192,7 @@ def main():
     if args.no_powertrace is not None:
        print("E2E loss/gain rate summary:")
        printE2ESummary()
-       plotE2E()
+       #plotE2E()
        print("Dissemination time summary:")
        printDisseminationTimeSummary()
        plotDisseminationTime()
