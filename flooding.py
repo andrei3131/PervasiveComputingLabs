@@ -8,6 +8,21 @@ from matplotlib.ticker import FuncFormatter
 
 powerDictionary = {}
 disseminationMap = {}
+disseminationTimeMap = {}
+
+class DeltaTime:
+    def __init__(self, sentAt):
+        self.sentAt = sentAt
+        self.lastReceiveAt = None
+
+    def updateLastReceiveAt(self, time):
+        self.lastReceiveAt = time
+
+    def isValid(self):
+        return self.lastReceiveAt is not None
+
+    def getTimeDifference(self):
+        return self.lastReceiveAt - self.sentAt
 
 def plotE2E():
     dissemination_ids = [d for d in disseminationMap]
@@ -28,6 +43,27 @@ def plotE2E():
     plt.gcf().axes[0].yaxis.set_major_formatter(FuncFormatter(lambda y, _: '{:.0%}'.format(y)))
     plt.show()
 
+def plotDisseminationTime():
+    dissemination_ids = [d for d in disseminationTimeMap if disseminationTimeMap[d].isValid()]
+    deltaTimes = [disseminationTimeMap[d].getTimeDifference() for d in disseminationMap if disseminationTimeMap[d].isValid()]
+    fig = plt.figure()
+    plt.plot(dissemination_ids, deltaTimes, marker='x', markersize=3)
+    s = 0
+    for dissemination in disseminationTimeMap:
+        deltaTime = disseminationTimeMap[dissemination]
+        if deltaTime.isValid():
+           s += deltaTime.getTimeDifference()
+    plt.axhline(y=s / len(disseminationTimeMap), color='r', linestyle='-', label='Average dissemination time ' + '%.3f'%(s / len(disseminationTimeMap)) + "ms")
+
+    plt.gca().set_ylim([0, 300])
+    fig.suptitle("Dissemination Time Graph", fontsize=12)
+    plt.xlabel('Dissemination ID', fontsize=18)
+    plt.ylabel('Dissemination time', fontsize=16)
+    plt.legend()
+
+    plt.show()
+
+
 def simpleProcess(line):
     #discard first five minutes
     if int(line.split(':', 1)[0]) < 5:
@@ -46,9 +82,14 @@ def simpleProcess(line):
     if("Broadcast message sent" in line and potential_dissemination_id.isdigit()):
         dissemination_id = int(potential_dissemination_id)
         disseminationMap[dissemination_id] = 0
+        disseminationTimeMap[dissemination_id] = DeltaTime(currentTimeMilliseconds)
     if("Broadcast recv from" in line and line.split(" ")[-1].isdigit()):
         id = int(line.split(" ")[-1])
         disseminationMap[id] += 1
+        disseminationTimeMap[id].updateLastReceiveAt(currentTimeMilliseconds)
+        # Debug the outlier: for id 195: sentAt = 00:34:54,  lastReceiveAt = 00:35:24
+        # if(disseminationTimeMap[id].getTimeDifference() > 30000):
+        #   import pdb; pdb.set_trace()
 
 
 def powerTraceLineProcess(line):
@@ -75,6 +116,28 @@ def powerTraceLineProcess(line):
           powerDictionary[id].addPowerStatistic(Tx, Rx, CPU, LPM)
        powerDictionary[id].powerTick(time, Node.computePowerUsage(Tx, Rx, CPU, LPM))
 
+def printPowerSummary():
+    for node in powerDictionary:
+        print("Node " + str(node) + " has average power " + str(powerDictionary[node].getAvgPower()) + " mW")
+
+def printE2ESummary():
+    s = 0
+    for dissemination in disseminationMap:
+        e2e = disseminationMap[dissemination] / 30
+        s += e2e
+        print("Dissemination " + str(dissemination) + ": " + '%.3f'%(e2e * 100) + "% nodes received an update.")
+    print("Average E2E-Loss rate is " + str(1 - s / len(disseminationMap)) + "\n")
+
+def printDisseminationTimeSummary():
+    s = 0
+    for dissemination in disseminationTimeMap:
+        deltaTime = disseminationTimeMap[dissemination]
+        if deltaTime.isValid():
+           s += deltaTime.getTimeDifference()
+           print("Dissemination " + str(dissemination) + " has dissemination time: " + str(deltaTime.getTimeDifference()) + "ms")
+    print("Average dissemination time is " + str(s / len(disseminationTimeMap)) + "ms\n")
+
+
 def processline(f, line):
     f(line)
 
@@ -100,18 +163,20 @@ def main():
         while line:
             processline(handle, line)
             line = fp.readline()
-    print("First 5 minutes have been discarded.")
-    for node in powerDictionary:
-        print("Node " + str(node) + " has average power " + str(powerDictionary[node].getAvgPower()) + " mW")
-    # plot power node 1
-    # powerDictionary[1].plotPower()
-    s = 0
-    for dissemination in disseminationMap:
-        e2e = disseminationMap[dissemination] / 30
-        s += e2e
-        print("Dissemination " + str(dissemination) + ": " + '%.3f'%(e2e * 100) + "% nodes received an update.")
-    print("Average E2E-Loss rate is " + str(1 - s / len(disseminationMap)))
-    plotE2E()
+    print("Note: First 5 minutes have been discarded.")
+    if args.power is not None:
+       print("Power consumption summary:")
+       printPowerSummary()
+       # plot power node 1
+       # powerDictionary[1].plotPower()
+
+    if args.no_powertrace is not None:
+       print("E2E loss/gain rate summary:")
+       printE2ESummary()
+       plotE2E()
+       print("Dissemination time summary:")
+       printDisseminationTimeSummary()
+       plotDisseminationTime()
 
 if __name__ == "__main__":
    main()
