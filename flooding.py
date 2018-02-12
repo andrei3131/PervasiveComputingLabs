@@ -80,11 +80,17 @@ def plotDisseminationTime():
 
     plt.show()
 
+discardToFirstBroadcast = False
 
 def simpleProcess(line):
     #discard first five minutes
     if int(line.split(':', 1)[0]) < 5:
         return None
+
+    global discardToFirstBroadcast
+    potential_dissemination_id = line.split(" ")[-1]
+    if not discardToFirstBroadcast and "Broadcast message sent" in line and potential_dissemination_id.isdigit():
+        discardToFirstBroadcast = True
 
     metadata = line.split(" ", 1)[0].split("\t")
     id = int(metadata[1].split(":")[1])
@@ -105,6 +111,9 @@ def simpleProcess(line):
         disseminationTimeMap[id] = NodeDisseminations(dissemination_id, currentTimeMilliseconds)
     if("Broadcast recv from" in line and line.split(" ")[-1].isdigit()):
         dissem_id = int(line.split(" ")[-1])
+        # Because the first 5 minutes are discarded, might lose msg Broadcast message sent <dissem_id>
+        if dissem_id is 0:
+            import pdb; pdb.set_trace()
         disseminationMap[dissem_id].add(id)
 
         originating_node = int(line.split(" ")[-4])

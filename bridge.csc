@@ -385,12 +385,14 @@
   <plugin>
     org.contikios.cooja.plugins.ScriptRunner
     <plugin_config>
-      <script>cnt = 1;
+      <script>
+TIMEOUT(3600000)
+cnt = 1;
 while(true){
     time_add = (Math.floor(Math.random() * 10) + 1)*1000;
     wait_time = sim.getSimulationTimeMillis() + time_add;
     YIELD_THEN_WAIT_UNTIL(sim.getSimulationTimeMillis() &gt; wait_time);
-    log.log(cnt +'\n');   
+    log.log(cnt +'\n');
     new_mote = (Math.floor(Math.random() * 12) + 1);
     write(sim.getMoteWithID(new_mote),cnt);
     cnt = cnt + 1;
@@ -404,4 +406,3 @@ while(true){
     <location_y>178</location_y>
   </plugin>
 </simconf>
-
