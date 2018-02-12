@@ -99,7 +99,7 @@ def simpleProcess(line):
     if("Broadcast message sent" in line and potential_dissemination_id.isdigit()):
         dissemination_id = int(potential_dissemination_id)
         record = set()
-        record.add(id)
+        #record.add(id)
         disseminationMap[dissemination_id] = record
         # id is the id of the originating node
         disseminationTimeMap[id] = NodeDisseminations(dissemination_id, currentTimeMilliseconds)
