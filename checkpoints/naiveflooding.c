@@ -11,7 +11,6 @@
 
 #include "dev/leds.h"
 #include "dev/serial-line.h"
-#include "powertrace.h"
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -32,7 +31,7 @@ static struct ctimer message_sent;
 PROCESS(main_process, "Naive Flooding");
 AUTOSTART_PROCESSES(&main_process);
 
-/* callback function to request a message
+/* callback function to request a message 
  * if node 1 has not seen a message for 10 seconds
  */
 static void
@@ -50,7 +49,7 @@ broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from)
   packetbuf_copyto(&payload_recv);
 
   printf("Broadcast recv from %d of %d with id %d\n", from->u8[0],payload_recv.nodes[0],payload_recv.flood_id);
-
+  
   int i = 0;
   for(i = 0; i < payload_recv.node_count;i++){
     if(payload_recv.nodes[i] == linkaddr_node_addr.u8[0]){
@@ -84,13 +83,12 @@ PROCESS_THREAD(main_process, ev, data)
   PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
   char *buf;
 
-  //powertrace_start(CLOCK_SECOND * 10);
   PROCESS_BEGIN();
   broadcast_open(&broadcast, 129, &broadcast_call);
   if(linkaddr_node_addr.u8[0] == 1){
-    ctimer_set(&message_sent, CLOCK_SECOND * 10,request_message,NULL);
+    ctimer_set(&message_sent, CLOCK_SECOND * 10,request_message,NULL);   
   }
-
+  
   while(1) {
       /* Wait until javascript sends a counter value */
       PROCESS_WAIT_EVENT_UNTIL(ev == serial_line_event_message && data != NULL);

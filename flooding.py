@@ -10,13 +10,16 @@ powerDictionary = {}
 disseminationMap = {}
 disseminationTimeMap = {}
 
+no_nodes = 30
+
 class NodeDisseminations:
     def __init__(self, dissemination_id, currentTime):
         self.disseminations_for_node = {}
         self.disseminations_for_node[dissemination_id] = DeltaTime(currentTime)
 
     def updateLastReceive(self, dissemination_id, currentTime):
-        self.disseminations_for_node[dissemination_id].updateLastReceiveAt(currentTime)
+        if dissemination_id in self.disseminations_for_node:
+           self.disseminations_for_node[dissemination_id].updateLastReceiveAt(currentTime)
 
     def computeAvgDisseminationTimeForNode(self):
         s = 0
@@ -28,8 +31,9 @@ class NodeDisseminations:
 
 class DeltaTime:
     def __init__(self, sentAt):
-        self.sentAt = sentAt
         self.lastReceiveAt = None
+        self.recv_nodes = set()
+        self.sentAt = sentAt
 
     def updateLastReceiveAt(self, time):
         self.lastReceiveAt = time
@@ -42,12 +46,12 @@ class DeltaTime:
 
 def plotE2E():
     dissemination_ids = [d for d in disseminationMap]
-    e2e_gains = [disseminationMap[d] / 30 for d in disseminationMap]
+    e2e_gains = [len(disseminationMap[d]) / no_nodes for d in disseminationMap]
     fig = plt.figure()
     plt.plot(dissemination_ids, e2e_gains, marker='o')
     s = 0
     for dissemination in disseminationMap:
-        e2e = disseminationMap[dissemination] / 30
+        e2e = len(disseminationMap[dissemination]) / no_nodes
         s += e2e
     plt.axhline(y=s / len(disseminationMap), color='r', linestyle='-', label='Average E2E gain rate ' + '%.3f'%(100 * s / len(disseminationMap)) + "%")
 
@@ -70,9 +74,9 @@ def plotDisseminationTime():
         nodeDisseminations = disseminationTimeMap[originating_node]
         s += nodeDisseminations.computeAvgDisseminationTimeForNode()
 
-    plt.axhline(y=s / len(disseminationTimeMap), color='r', linestyle='-', label='Average dissemination time ' + '%.3f'%(s / 30) + "ms")
+    plt.axhline(y=s / len(disseminationTimeMap), color='r', linestyle='-', label='Average dissemination time ' + '%.3f'%(s / no_nodes) + "ms")
 
-    plt.gca().set_ylim([0, 200])
+    #plt.gca().set_ylim([0, 200])
     fig.suptitle("Dissemination Time Graph Per Node", fontsize=12)
     plt.xlabel('Node ID', fontsize=18)
     plt.ylabel('Average node dissemination time', fontsize=16)
@@ -81,6 +85,7 @@ def plotDisseminationTime():
     plt.show()
 
 discardToFirstBroadcast = False
+
 
 def simpleProcess(line):
     #discard first five minutes
@@ -109,11 +114,10 @@ def simpleProcess(line):
         disseminationMap[dissemination_id] = record
         # id is the id of the originating node
         disseminationTimeMap[id] = NodeDisseminations(dissemination_id, currentTimeMilliseconds)
+
     if("Broadcast recv from" in line and line.split(" ")[-1].isdigit()):
         dissem_id = int(line.split(" ")[-1])
         # Because the first 5 minutes are discarded, might lose msg Broadcast message sent <dissem_id>
-        if dissem_id is 0:
-            import pdb; pdb.set_trace()
         disseminationMap[dissem_id].add(id)
 
         originating_node = int(line.split(" ")[-4])
@@ -154,7 +158,7 @@ def printPowerSummary():
 def printE2ESummary():
     s = 0
     for dissemination in disseminationMap:
-        e2e = len(disseminationMap[dissemination]) / 30
+        e2e = len(disseminationMap[dissemination]) / no_nodes
         s += e2e
         print("Dissemination " + str(dissemination) + ": " + '%.3f'%(e2e * 100) + "% nodes received an update.")
     print("Average E2E-Loss rate is " + str(s / len(disseminationMap)) + "\n")
@@ -165,7 +169,7 @@ def printDisseminationTimeSummary():
         nodeDisseminations = disseminationTimeMap[originating_node]
         s += nodeDisseminations.computeAvgDisseminationTimeForNode()
         print("Node " + str(originating_node) + " has dissemination time: " + str(nodeDisseminations.computeAvgDisseminationTimeForNode()) + "ms")
-    print("Average dissemination time is " + str(s / 30) + "ms\n")
+    print("Average dissemination time is " + str(s / no_nodes) + "ms\n")
 
 
 def processline(f, line):
@@ -198,12 +202,12 @@ def main():
        print("Power consumption summary:")
        printPowerSummary()
        # plot power node 1
-       # powerDictionary[1].plotPower()
+       powerDictionary[1].plotPower()
 
     if args.no_powertrace is not None:
        print("E2E loss/gain rate summary:")
        printE2ESummary()
-       #plotE2E()
+       plotE2E()
        print("Dissemination time summary:")
        printDisseminationTimeSummary()
        plotDisseminationTime()

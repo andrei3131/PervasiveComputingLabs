@@ -17,10 +17,11 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-#define NO_OF_NODES 15
+#define NO_OF_NODES 10
+#define PROBABILITY 2
 
 struct message{
-  uint8_t flood_id;
+  uint16_t flood_id;
   uint8_t node_count;
   uint8_t nodes[NO_OF_NODES];
 };
@@ -66,10 +67,11 @@ broadcast_recv(struct broadcast_conn *c, const linkaddr_t *from)
   if(!received){
     payload_recv.nodes[payload_recv.node_count]  = linkaddr_node_addr.u8[0];
     payload_recv.node_count = payload_recv.node_count + 1;
-
-    packetbuf_copyfrom(&payload_recv,sizeof(payload_recv));
-    broadcast_send(&broadcast);
-    printf("Broadcast message sent\n");
+   if ((rand() % 10) < PROBABILITY) {
+       packetbuf_copyfrom(&payload_recv,sizeof(payload_recv));
+       broadcast_send(&broadcast);
+       printf("Broadcast message sent\n");
+    }
     if(linkaddr_node_addr.u8[0] == 1){
       ctimer_reset(&message_sent);
     }
@@ -84,7 +86,7 @@ PROCESS_THREAD(main_process, ev, data)
   PROCESS_EXITHANDLER(broadcast_close(&broadcast);)
   char *buf;
 
-  //powertrace_start(CLOCK_SECOND * 10);
+  powertrace_start(CLOCK_SECOND * 10);
   PROCESS_BEGIN();
   broadcast_open(&broadcast, 129, &broadcast_call);
   if(linkaddr_node_addr.u8[0] == 1){
