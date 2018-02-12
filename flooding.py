@@ -64,12 +64,12 @@ def plotDisseminationTime():
     avgs_per_node = [disseminationTimeMap[n].computeAvgDisseminationTimeForNode() for n in disseminationTimeMap]
     fig = plt.figure()
     plt.plot(node_ids, avgs_per_node, marker='x', markersize=3)
-    
+
     s = 0
     for originating_node in disseminationTimeMap:
         nodeDisseminations = disseminationTimeMap[originating_node]
         s += nodeDisseminations.computeAvgDisseminationTimeForNode()
-    
+
     plt.axhline(y=s / len(disseminationTimeMap), color='r', linestyle='-', label='Average dissemination time ' + '%.3f'%(s / 30) + "ms")
 
     plt.gca().set_ylim([0, 200])
@@ -98,12 +98,14 @@ def simpleProcess(line):
     potential_dissemination_id = line.split(" ")[-1]
     if("Broadcast message sent" in line and potential_dissemination_id.isdigit()):
         dissemination_id = int(potential_dissemination_id)
-        disseminationMap[dissemination_id] = 0
+        record = set()
+        record.add(id)
+        disseminationMap[dissemination_id] = record
         # id is the id of the originating node
         disseminationTimeMap[id] = NodeDisseminations(dissemination_id, currentTimeMilliseconds)
     if("Broadcast recv from" in line and line.split(" ")[-1].isdigit()):
         dissem_id = int(line.split(" ")[-1])
-        disseminationMap[dissem_id] += 1
+        disseminationMap[dissem_id].add(id)
 
         originating_node = int(line.split(" ")[-4])
         disseminationTimeMap[originating_node].updateLastReceive(dissem_id, currentTimeMilliseconds)
@@ -143,10 +145,10 @@ def printPowerSummary():
 def printE2ESummary():
     s = 0
     for dissemination in disseminationMap:
-        e2e = disseminationMap[dissemination] / 30
+        e2e = len(disseminationMap[dissemination]) / 30
         s += e2e
         print("Dissemination " + str(dissemination) + ": " + '%.3f'%(e2e * 100) + "% nodes received an update.")
-    print("Average E2E-Loss rate is " + str(1 - s / len(disseminationMap)) + "\n")
+    print("Average E2E-Loss rate is " + str(s / len(disseminationMap)) + "\n")
 
 def printDisseminationTimeSummary():
     s = 0
